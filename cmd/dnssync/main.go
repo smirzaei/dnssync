@@ -1,25 +1,61 @@
 package main
 
 import (
+	"context"
+	"os"
+	"os/signal"
+	"sync"
+	"syscall"
+
 	"github.com/smirzaei/dnssync/internal/cli"
+	"github.com/smirzaei/dnssync/internal/daemon"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
 func main() {
-	logger := initLogger()
+	args := cli.ParseArgs()
+
+	logger := initLogger(args.Verbose)
 	defer func() {
 		_ = logger.Sync()
 	}()
 
-	args := cli.ParseArgs()
+	d := daemon.NewDaemon(logger, args)
+	ctx, cancel := context.WithCancel(context.Background())
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
 
-	logger.Info("Hello, world!", zap.Any("args", args))
+	go func() {
+		err := d.Run(ctx)
+		if err != nil {
+			logger.Error("daemon failure", zap.Error(err))
+		}
+		logger.Info("daemon is stopped")
+		wg.Done()
+	}()
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	s := <-sigChan
+	logger.Info("received termination signal, shutting down", zap.String("signal", s.String()))
+	cancel()
+
+	wg.Wait()
 }
 
-func initLogger() *zap.Logger {
+func initLogger(verbose bool) *zap.Logger {
+	var logLevel zap.AtomicLevel
+	if verbose {
+		logLevel = zap.NewAtomicLevelAt(zapcore.DebugLevel)
+	} else {
+		logLevel = zap.NewAtomicLevelAt(zapcore.InfoLevel)
+	}
+
 	cfg := zap.NewProductionConfig()
 	cfg.EncoderConfig.EncodeTime = zapcore.RFC3339TimeEncoder
+	cfg.Level = logLevel
 
 	logger, err := cfg.Build()
 	if err != nil {
