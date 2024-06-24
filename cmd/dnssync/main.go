@@ -21,7 +21,11 @@ func main() {
 		_ = logger.Sync()
 	}()
 
-	d := daemon.NewDaemon(logger, args)
+	d, err := daemon.NewDaemon(logger, args)
+	if err != nil {
+		panic(err)
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	wg := &sync.WaitGroup{}
 	wg.Add(1)

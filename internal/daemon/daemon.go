@@ -5,26 +5,32 @@ import (
 	"time"
 
 	"github.com/smirzaei/dnssync/internal/cli"
-	"github.com/smirzaei/dnssync/internal/lookup"
+	"github.com/smirzaei/dnssync/internal/ip"
 	"go.uber.org/zap"
 )
 
 type Daemon struct {
-	l        *zap.Logger
-	args     cli.Args
-	ipLookup *lookup.IPLookup
+	l         *zap.Logger
+	args      cli.Args
+	ipLookup  *ip.IPLookup
+	ipUpdater *ip.IPUpdater
 }
 
-func NewDaemon(logger *zap.Logger, args cli.Args) *Daemon {
-	ipLookup := lookup.NewIPLookup(logger)
-
-	d := Daemon{
-		l:        logger,
-		args:     args,
-		ipLookup: ipLookup,
+func NewDaemon(logger *zap.Logger, args cli.Args) (*Daemon, error) {
+	ipLookup := ip.NewIPLookup(logger)
+	ipUpdater, err := ip.NewIPUpdater(logger, args.CloudflareApiKey, args.ZoneID)
+	if err != nil {
+		return nil, err
 	}
 
-	return &d
+	d := Daemon{
+		l:         logger,
+		args:      args,
+		ipLookup:  ipLookup,
+		ipUpdater: ipUpdater,
+	}
+
+	return &d, nil
 }
 
 func (d *Daemon) Run(ctx context.Context) error {
