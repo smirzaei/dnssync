@@ -61,7 +61,7 @@ func (d *Daemon) Run(ctx context.Context) error {
 			}
 
 			d.l.Info("new ip", zap.String("ip", ip.String()))
-			err = d.ipUpdater.UpdateIP(ctx, d.args.DNSRecordName, ip)
+			err = d.ipUpdater.UpdateIP(ctx, d.args.DNSRecordID, ip)
 			if err != nil {
 				d.l.Error("failed to update ip address", zap.Error(err))
 				continue
