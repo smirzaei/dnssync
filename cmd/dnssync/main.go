@@ -21,6 +21,10 @@ func main() {
 		_ = logger.Sync()
 	}()
 
+	if args.Verbose {
+		logger.Debug("loaded args", zap.Any("args", args))
+	}
+
 	d, err := daemon.NewDaemon(logger, args)
 	if err != nil {
 		panic(err)

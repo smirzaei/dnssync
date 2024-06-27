@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"context"
+	"net"
 	"time"
 
 	"github.com/smirzaei/dnssync/internal/cli"
@@ -37,6 +38,8 @@ func (d *Daemon) Run(ctx context.Context) error {
 	updateInterval := time.Second * time.Duration(d.args.Interval)
 	d.l.Info("updating in the background", zap.Duration("interval", updateInterval))
 
+	var currentIP net.IP
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -51,6 +54,21 @@ func (d *Daemon) Run(ctx context.Context) error {
 			}
 
 			d.l.Debug("ip lookup success", zap.String("ip", ip.String()))
+
+			if net.IP.Equal(currentIP, ip) {
+				d.l.Debug("ip hasn't changed", zap.String("current_ip", string(currentIP)))
+				continue
+			}
+
+			d.l.Info("new ip", zap.String("ip", ip.String()))
+			err = d.ipUpdater.UpdateIP(ctx, d.args.DNSRecordName, ip)
+			if err != nil {
+				d.l.Error("failed to update ip address", zap.Error(err))
+				continue
+			}
+
+			d.l.Debug("successfully updated the new ip")
+			currentIP = ip
 		}
 	}
 }
