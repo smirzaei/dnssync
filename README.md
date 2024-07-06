@@ -29,7 +29,7 @@ Options:
 ```
 
 * Find your zone-id [here](https://developers.cloudflare.com/fundamentals/setup/find-account-and-zone-ids/).
-* [Create API token](https://developers.cloudflare.com/fundamentals/api/get-started/create-token/):
+* How to Create API token? [Cloudflare docs](https://developers.cloudflare.com/fundamentals/api/get-started/create-token/).
 
 ### License
 
