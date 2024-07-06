@@ -56,7 +56,7 @@ func (d *Daemon) Run(ctx context.Context) error {
 			d.l.Debug("ip lookup success", zap.String("ip", ip.String()))
 
 			if net.IP.Equal(currentIP, ip) {
-				d.l.Debug("ip hasn't changed", zap.String("current_ip", string(currentIP)))
+				d.l.Debug("ip hasn't changed", zap.String("current_ip", currentIP.String()))
 				continue
 			}
 
