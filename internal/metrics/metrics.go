@@ -3,6 +3,7 @@ package metrics
 import (
 	"net"
 	"sync"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -101,12 +102,12 @@ func (m *AppMetrics) IncIPUpdateTotal(status IPUpdateStatus) {
 	m.ipUpdateTotal.WithLabelValues(string(status)).Inc()
 }
 
-func (m *AppMetrics) ObserveIPCheckLatency(duration float64) {
-	m.ipCheckDuration.WithLabelValues().Observe(duration)
+func (m *AppMetrics) ObserveIPCheckLatency(duration time.Duration, status IPCheckStatus) {
+	m.ipCheckDuration.WithLabelValues(string(status)).Observe(duration.Seconds())
 }
 
-func (m *AppMetrics) ObserveIPUpdateLatency(duration float64) {
-	m.ipUpdateDuration.WithLabelValues().Observe(duration)
+func (m *AppMetrics) ObserveIPUpdateLatency(duration time.Duration, status IPUpdateStatus) {
+	m.ipUpdateDuration.WithLabelValues(string(status)).Observe(duration.Seconds())
 }
 
 func (m *AppMetrics) GetMetrics() []prometheus.Collector {
