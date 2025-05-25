@@ -1,12 +1,13 @@
 module github.com/smirzaei/dnssync
 
-go 1.22.4
+go 1.24.3
 
 require (
 	github.com/alexflint/go-arg v1.5.0
 	github.com/cloudflare/cloudflare-go v0.98.0
 	github.com/prometheus/client_golang v1.22.0
 	go.uber.org/zap v1.27.0
+	golang.org/x/sync v0.14.0
 )
 
 require (

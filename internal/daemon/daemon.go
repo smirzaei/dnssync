@@ -10,6 +10,7 @@ import (
 	"github.com/smirzaei/dnssync/internal/ip"
 	"github.com/smirzaei/dnssync/internal/metrics"
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 )
 
 type Daemon struct {
@@ -46,15 +47,46 @@ func NewDaemon(logger *zap.Logger, args cli.Args) (*Daemon, error) {
 }
 
 func (d *Daemon) Run(ctx context.Context) error {
-	// TODO: start the HTTP server
+	g, gCtx := errgroup.WithContext(ctx)
+	g.Go(func() error {
+		if err := d.httpServer.Run(gCtx); err != nil {
+			d.l.Error("HTTP server failed", zap.Error(err))
+			return err
+		}
+		d.l.Info("HTTP server stopped")
+		return nil
+	})
 
+	g.Go(func() error {
+		if err := d.runUpdater(gCtx); err != nil {
+			d.l.Error("IP updater failed", zap.Error(err))
+			return err
+		}
+		d.l.Info("IP updater stopped")
+		return nil
+	})
+
+	d.l.Info("daemon and http server running, waiting for group")
+	if err := g.Wait(); err != nil {
+		if err != context.Canceled && err != context.DeadlineExceeded {
+			d.l.Error("errgroup encountered an error", zap.Error(err))
+		}
+		return err
+	}
+
+	d.l.Info("daemon shut down gracefully")
+	return nil
+}
+
+func (d *Daemon) runUpdater(ctx context.Context) error {
 	updateInterval := time.Second * time.Duration(d.args.Interval)
-	d.l.Info("starting daemon", zap.Duration("update_interval", updateInterval))
+	d.l.Info("starting IP update loop", zap.Duration("update_interval", updateInterval))
 
 	var currentIP net.IP
 
-	lookedUpIP, err := d.ipLookup.LookupPublicIP(ctx)
+	// Initial IP check and update
 	lookupTime := time.Now()
+	lookedUpIP, err := d.ipLookup.LookupPublicIP(ctx)
 	if err != nil {
 		d.l.Error("initial public ip lookup failure", zap.Error(err))
 		d.appMetrics.IncIPCheckTotal(metrics.IPCheckStatusFailure)
@@ -62,10 +94,9 @@ func (d *Daemon) Run(ctx context.Context) error {
 	} else {
 		d.l.Info("initial ip lookup success", zap.String("ip", lookedUpIP.String()))
 		d.appMetrics.IncIPCheckTotal(metrics.IPCheckStatusSuccess)
-		d.appMetrics.ObserveIPCheckDuration(time.Since(lookupTime), metrics.IPCheckStatusSuccess)
+		d.appMetrics.ObserveIPCheckDuration(time.Since(lookupTime), metrics.IPCheckStatusSuccess) // Placeholder
 		d.appMetrics.UpdateCurrentIP(lookedUpIP)
 
-		// Attempt to set this as the current DNS IP
 		updateStartTime := time.Now()
 		err = d.ipUpdater.UpdateIP(ctx, d.args.DNSRecord, lookedUpIP)
 		updateDuration := time.Since(updateStartTime)
@@ -78,7 +109,6 @@ func (d *Daemon) Run(ctx context.Context) error {
 			updateStatus = metrics.IPUpdateStatusSuccess
 			currentIP = lookedUpIP
 		}
-
 		d.appMetrics.IncIPUpdateTotal(updateStatus)
 		d.appMetrics.ObserveIPUpdateDuration(updateDuration, updateStatus)
 	}
@@ -89,8 +119,8 @@ func (d *Daemon) Run(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			d.l.Info("received exit signal, daemon shutting down")
-			return nil
+			d.l.Info("IP update loop shutting down due to context cancellation")
+			return ctx.Err()
 		case tickTime := <-ticker.C:
 			d.l.Debug("tick received, performing IP check", zap.Time("tick_time", tickTime))
 
@@ -98,6 +128,10 @@ func (d *Daemon) Run(ctx context.Context) error {
 			newLookedUpIP, err := d.ipLookup.LookupPublicIP(ctx)
 			checkDuration := time.Since(checkStartTime)
 			if err != nil {
+				if ctx.Err() != nil {
+					d.l.Info("IP lookup aborted due to context cancellation")
+					return ctx.Err()
+				}
 				d.l.Error("public ip lookup failure", zap.Error(err))
 				d.appMetrics.IncIPCheckTotal(metrics.IPCheckStatusFailure)
 				d.appMetrics.ObserveIPCheckDuration(checkDuration, metrics.IPCheckStatusFailure)
@@ -134,4 +168,5 @@ func (d *Daemon) Run(ctx context.Context) error {
 			currentIP = newLookedUpIP
 		}
 	}
+
 }

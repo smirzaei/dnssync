@@ -70,7 +70,7 @@ func NewHTTPServer(logger *zap.Logger, conf HTTPServerConfig, metricsProvider Me
 }
 
 func (h *HTTPServer) Run(ctx context.Context) error {
-	h.logger.Info("HTTP server listening", zap.String("address", h.server.Addr))
+	h.logger.Info("HTTP server starting", zap.String("address", h.server.Addr))
 
 	errChan := make(chan error, 1)
 
