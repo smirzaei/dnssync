@@ -34,6 +34,9 @@ type AppMetrics struct {
 
 func NewAppMetrics() *AppMetrics {
 	m := AppMetrics{
+		mutex:       &sync.Mutex{},
+		lastKnownIP: net.IPv4zero,
+
 		currentIP: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name: "current_ip",
@@ -71,7 +74,7 @@ func NewAppMetrics() *AppMetrics {
 		),
 		ipUpdateDuration: prometheus.NewHistogramVec(
 			prometheus.HistogramOpts{
-				Name:    "ip_update_latency_seconds",
+				Name:    "ip_update_duration_seconds",
 				Help:    "Duration of public IP address update operations",
 				Buckets: prometheus.ExponentialBuckets(0.001, 2, 13), // From 1ms to ~4096ms
 			},
@@ -79,18 +82,22 @@ func NewAppMetrics() *AppMetrics {
 		),
 	}
 
-	m.lastKnownIP = net.IPv4zero
-
 	return &m
 }
 
 func (m *AppMetrics) UpdateCurrentIP(ip net.IP) {
+	if ip == nil {
+		return
+	}
+
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
 	if !ip.Equal(m.lastKnownIP) {
+		m.currentIP.WithLabelValues(m.lastKnownIP.String()).Set(0)
 		m.currentIP.WithLabelValues(ip.String()).Set(1)
 		m.lastIPChangeTimestamp.SetToCurrentTime()
+		m.lastKnownIP = ip
 	}
 }
 
@@ -102,11 +109,11 @@ func (m *AppMetrics) IncIPUpdateTotal(status IPUpdateStatus) {
 	m.ipUpdateTotal.WithLabelValues(string(status)).Inc()
 }
 
-func (m *AppMetrics) ObserveIPCheckLatency(duration time.Duration, status IPCheckStatus) {
+func (m *AppMetrics) ObserveIPCheckDuration(duration time.Duration, status IPCheckStatus) {
 	m.ipCheckDuration.WithLabelValues(string(status)).Observe(duration.Seconds())
 }
 
-func (m *AppMetrics) ObserveIPUpdateLatency(duration time.Duration, status IPUpdateStatus) {
+func (m *AppMetrics) ObserveIPUpdateDuration(duration time.Duration, status IPUpdateStatus) {
 	m.ipUpdateDuration.WithLabelValues(string(status)).Observe(duration.Seconds())
 }
 
