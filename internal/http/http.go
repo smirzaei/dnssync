@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 )
 
@@ -16,15 +18,29 @@ type HTTPServerConfig struct {
 	IdleTimeout  time.Duration
 }
 
+type MetricsProvider interface {
+	GetCollectors() []prometheus.Collector
+}
+
 type HTTPServer struct {
 	conf   HTTPServerConfig
 	server *http.Server
 	logger *zap.Logger
 }
 
-func NewHTTPServer(logger zap.Logger, conf HTTPServerConfig) *HTTPServer {
+func NewHTTPServer(logger *zap.Logger, conf HTTPServerConfig, metricsProvider MetricsProvider) *HTTPServer {
 	mux := http.NewServeMux()
-	// mux.Handle("/metrics", promhttp.Handler()) // TODO
+	registry := prometheus.NewRegistry()
+
+	collectors := metricsProvider.GetCollectors()
+	if len(collectors) > 0 {
+		registry.MustRegister(collectors...)
+	}
+
+	metricsHandler := promhttp.HandlerFor(registry, promhttp.HandlerOpts{
+		ErrorLog: zap.NewStdLog(logger.Named("prom-http")),
+	})
+	mux.Handle("/metrics", metricsHandler)
 
 	if conf.ReadTimeout == 0 {
 		conf.ReadTimeout = 5 * time.Second

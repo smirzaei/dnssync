@@ -4,6 +4,7 @@ import "github.com/alexflint/go-arg"
 
 type Args struct {
 	Interval         uint   `arg:"required" help:"How often sync the IP (in seconds)"`
+	HTTPPort         uint   `arg:"-p,--port" help:"The port to listen on for exposing metrics" default:"8080"`
 	ZoneID           string `arg:"-z,--zone-id,required" help:"The zone ID. Ref: https://developers.cloudflare.com/fundamentals/setup/find-account-and-zone-ids/"`
 	DNSRecord        string `arg:"-r,--dns-record,required" help:"The DNS record name. E.g. foo.example.com"`
 	CloudflareApiKey string `arg:"-k,--api-key,required" help:"Cloudflare API key. Ref: https://dash.cloudflare.com/profile/api-tokens"`

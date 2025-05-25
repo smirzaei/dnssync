@@ -117,7 +117,7 @@ func (m *AppMetrics) ObserveIPUpdateDuration(duration time.Duration, status IPUp
 	m.ipUpdateDuration.WithLabelValues(string(status)).Observe(duration.Seconds())
 }
 
-func (m *AppMetrics) GetMetrics() []prometheus.Collector {
+func (m *AppMetrics) GetCollectors() []prometheus.Collector { // Renamed from GetMetrics
 	return []prometheus.Collector{
 		m.currentIP,
 		m.lastIPChangeTimestamp,
